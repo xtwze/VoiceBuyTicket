@@ -1,4 +1,3 @@
-# main.py
 from config import MODEL_PATH, JAVA_BACKEND_URL, GIGACHAT_CREDENTIALS
 from bot import VoiceTicketBot
 

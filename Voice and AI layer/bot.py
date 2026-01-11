@@ -1,4 +1,3 @@
-# bot.py
 import json
 import requests
 

@@ -1,4 +1,3 @@
-# assistant_ai.py
 import json
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_gigachat.chat_models import GigaChat
