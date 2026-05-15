@@ -71,7 +71,7 @@ REST API, валидация, Lombok
 
 
 📁 Структура проекта
-textVoiceBuyTicket/
+VoiceBuyTicket/
 ├── JavaLayer/                  # Spring Boot backend
 │   ├── src/main/java/...
 │   └── pom.xml
