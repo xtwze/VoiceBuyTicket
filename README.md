@@ -1,107 +1,110 @@
-# VoiceBuyTicket  
-Голосовой ассистент для покупки ж/д билетов РЖД
+# 🎤 VoiceBuyTicket
 
-Демонстрационный проект, который позволяет купить билет на поезд, просто разговаривая в микрофон.
+**Голосовой ассистент для покупки железнодорожных билетов РЖД**
 
-## Основная идея
+*Демонстрационный проект, где вы просто говорите в микрофон — и билет куплен.*
 
-Вы говорите в микрофон →  
-система распознаёт речь →  
-ИИ ведёт диалог и уточняет детали →  
-формирует заказ →  
-отправляет на Java-бэкенд →  
-проверяет места и оформляет заказ (или предлагает ближайшие альтернативы)
+![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-6DB33F?logo=springboot&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)
+![Vosk](https://img.shields.io/badge/Vosk-Offline%20ASR-00B4D8)
+![GigaChat](https://img.shields.io/badge/GigaChat-Sber-4CAF50)
 
-## Технологический стек
+---
 
-### Frontend / Голосовой слой (Python)
-- **Vosk** — оффлайн-распознавание русской речи  
-- **GigaChat** (Сбер) — языковая модель для естественного диалога  
-- sounddevice + queue
+## ✨ О проекте
 
-### Backend
-- **Java 21** + **Spring Boot 3.2**  
-- **Spring Data JPA** + Hibernate  
-- **PostgreSQL**  
-- Lombok, Hibernate Validator
+**VoiceBuyTicket** — это инновационный голосовой интерфейс для покупки билетов на поезд.  
+Проект демонстрирует интеграцию **оффлайн распознавания речи**, **генеративного ИИ** и **enterprise Java backend**.
 
-## Как это работает (схема)
-Голос → Vosk (оффлайн) → текст
-↓
-GigaChat → диалог и сбор данных
-↓
-JSON с заказом
-↓
-Spring Boot REST API (/api/ticket/order)
-↓
-Проверка пассажира → поиск рейса → проверка мест
-↓
-либо успех + списание мест + сохранение заказа
-либо ближайшие альтернативные рейсы (±7 дней)
-text## Требования для запуска
+Вы говорите в микрофон → ИИ понимает запрос → проверяет места → оформляет заказ.
 
-- Java 21  
-- Maven  
-- PostgreSQL (можно в docker)  
-- Python 3.10+  
-- Vosk модель (маленькая русская)  
-- Доступ к GigaChat API (токен)
+### Ключевые возможности
 
-## Быстрый старт
+- 🎙️ Полностью голосовое управление (оффлайн)
+- 🧠 Интеллектуальный диалог с GigaChat
+- 🛤️ Поиск и бронирование билетов
+- 🔄 Предложение альтернативных рейсов
+- 🗄️ Надёжный Java Backend с PostgreSQL
 
-### 1. База данных (PostgreSQL)
+---
 
-```bash
-# Пример запуска через docker
-docker run -d \
-  --name voice-ticket-db \
-  -e POSTGRES_PASSWORD=your_password \
-  -e POSTGRES_DB=ticket_db \
-  -p 5432:5432 \
-  postgres:16
-Создайте таблицы (можно через schema.sql или flyway/liquibase)
-2. Запуск Java-бэкенда
-Bash# В папке с проектом
+## 🖼️ Как это работает
+
+```mermaid
+graph LR
+    A[🎤 Голос] --> B[Vosk ASR]
+    B --> C[GigaChat]
+    C --> D[JSON Заказ]
+    D --> E[Spring Boot API]
+    E --> F[PostgreSQL]
+    F --> G[✅ Билет оформлен]
+
+🚀 Быстрый старт
+1. Клонируйте репозиторий
+Bashgit clone https://github.com/xtwze/VoiceBuyTicket.git
+cd VoiceBuyTicket
+2. Запуск Backend (Java)
+Bashcd JavaLayer
 mvn clean package
-java -jar target/demo-0.0.1-SNAPSHOT.jar
-# или просто через IDE
-3. Подготовка Python-части
-Bash# Установка зависимостей
+java -jar target/*.jar
+3. Запуск Голосового Ассистента (Python)
+Bashcd "Voice and AI layer"
 pip install -r requirements.txt
+python main.py
+Подробная инструкция с настройкой БД, Vosk-модели и GigaChat токена — ниже.
 
-# Скачайте модель Vosk (маленькая русская)
-# https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip
-# Распакуйте и укажите путь в .env
+🛠️ Технологический стек
+Голосовой + AI слой (Python)
 
-# Создайте .env файл
-VOSK_MODEL_PATH=/path/to/vosk-model-small-ru-0.22
-JAVA_BACKEND_URL=http://localhost:8080/api/ticket/order
-GIGACHAT_CREDENTIALS=ваш_токен_гигачата
-4. Запуск голосового бота
-Bashpython main.py
-После запуска введите номер телефона тестового пассажира → говорите в микрофон.
-Минимальные тестовые данные в БД
-SQL-- Пассажир
-INSERT INTO passengers (phone, full_name, passport_series, passport_number)
-VALUES ('+79161234567', 'Иванов Иван Иванович', '45 12', '123456');
+Vosk — оффлайн распознавание русской речи
+GigaChat (Sber) — мощная языковая модель для диалога
+sounddevice, queue, requests
 
--- Несколько рейсов (пример)
-INSERT INTO trip (departure_station, arrival_station, departure_date, departure_time,
-                  train_number, carriage_type, total_seats, available_seats, price)
-VALUES 
-('Москва', 'Санкт-Петербург', '2026-02-15', '23:45', '029Я', 'Platzkart', 54, 42, 3850),
-('Москва', 'Санкт-Петербург', '2026-02-16', '00:35', '059Г', 'Compartment', 36, 18, 6200);
-Текущие ограничения
+Backend (Java)
 
-Диалог ИИ ещё не идеален (может зациклиться или неправильно понять)
-Нет синтеза речи (пока только текст в консоли)
-Нет выбора конкретного места и оплаты
-Нет возврата/обмена билетов
+Java 21 + Spring Boot 3.2
+Spring Data JPA + Hibernate
+PostgreSQL
+REST API, валидация, Lombok
 
-Планы на развитие
 
-Добавить голосовой синтез (например, Silero TTS)
-Улучшить устойчивость диалога
-Добавить выбор конкретного рейса из предложенных альтернатив
-Реализовать базовую авторизацию/регистрацию пассажиров
-Подключить тестовый платёжный шлюз
+📁 Структура проекта
+textVoiceBuyTicket/
+├── JavaLayer/                  # Spring Boot backend
+│   ├── src/main/java/...
+│   └── pom.xml
+├── Voice and AI layer/         # Голосовой ассистент
+│   ├── main.py
+│   ├── requirements.txt
+│   └── .env.example
+├── README.md
+└── .gitignore
+
+🎯 Основной сценарий
+
+Запуск приложения
+Ввод номера телефона пассажира
+Разговор с ассистентом:
+«Хочу в Санкт-Петербург на 15 февраля»
+«На вечерний поезд»
+«В плацкарте»
+
+Система находит места → оформляет заказ
+
+
+📈 Планы развития
+
+🔊 Синтез речи (Silero TTS / Yandex SpeechKit)
+🎟️ Выбор конкретного места в вагоне
+💳 Интеграция тестового платежного шлюза
+👤 Полноценная авторизация пассажиров
+📱 Telegram-бот версия
+🌐 Веб-интерфейс для демонстрации
+
+
+📝 Текущие ограничения
+
+Диалог иногда требует уточнений
+Нет синтеза речи (только текст + голосовой ввод)
+Упрощённая модель бронирования
