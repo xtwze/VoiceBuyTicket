@@ -69,6 +69,8 @@ Spring Data JPA + Hibernate
 PostgreSQL
 REST API, валидация, Lombok
 
+---
+
 
 📁 Структура проекта
 VoiceBuyTicket/
@@ -82,6 +84,8 @@ VoiceBuyTicket/
 ├── README.md
 └── .gitignore
 
+---
+
 🎯 Основной сценарий
 
 Запуск приложения
@@ -93,6 +97,7 @@ VoiceBuyTicket/
 
 Система находит места → оформляет заказ
 
+---
 
 📈 Планы развития
 
