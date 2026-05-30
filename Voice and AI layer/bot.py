@@ -1,100 +1,171 @@
+"""
+bot.py
+Главный управляющий класс бота.
+Интегрирует:
+  - AgentRouter (маршрутизация между агентами)
+  - VoskRecognizer (распознавание речи)
+  - Java backend (оформление заказа)
+"""
+
 import json
 import requests
 
-from assistant_ai import GigaChatAssistant
+from router import AgentRouter
 from recognizer import VoskRecognizer
 
+
 class VoiceTicketBot:
+
     def __init__(self, model_path: str, java_url: str, gigachat_credentials: str):
         self.recognizer = VoskRecognizer(model_path)
-        self.assistant_ai = GigaChatAssistant(gigachat_credentials)
-        self.java_url = java_url
+        self.router     = AgentRouter(gigachat_credentials)
+        self.java_url   = java_url
+        self.credentials = gigachat_credentials
+
+    # ------------------------------------------------------------------
+    # I/O
+    # ------------------------------------------------------------------
 
     def bot_say(self, text: str):
         print(f"\n[Бот]: {text}\n")
 
-    def send_to_java(self, order_json: dict, phone: str):
+    def listen(self) -> str:
+        text = self.recognizer.listen()
+        if not text:
+            self.bot_say("Не расслышал. Повторите, пожалуйста.")
+        return text
+
+    # ------------------------------------------------------------------
+    # Java backend
+    # ------------------------------------------------------------------
+
+    def send_to_java(self, order_json: dict, phone: str) -> tuple:
+        """
+        Отправить заказ в Java backend.
+        Возвращает (success: bool, alternatives: list).
+        """
         order_json["contact_phone"] = phone
         try:
             print("\n[Отправляем заказ в Java backend...]")
             print(json.dumps(order_json, indent=2, ensure_ascii=False))
 
             response = requests.post(self.java_url, json=order_json, timeout=15)
+            print(f"[HTTP {response.status_code}]: {response.text}")
             data = response.json()
 
-            if response.status_code != 200:
-                self.bot_say(f"Ошибка сервера: {data.get('message', 'Неизвестная ошибка')}")
-                return False  # Не оформлено
-
             status = data.get("status")
-            msg = data.get("message", "")
 
             if status == "success":
                 self.bot_say(
-                    f"{msg}\n"
-                    f"Поезд: {data.get('train_number')}\n"
-                    f"Время: {data.get('departure_time')}\n"
-                    f"Цена: {data.get('price_total')} руб.\n"
+                    f"{data.get('message')}\n"
+                    f"Поезд: {data.get('trainNumber')}\n"
+                    f"Время: {data.get('departureTime')}\n"
+                    f"Цена:  {data.get('priceTotal')} руб.\n"
                     f"Приятной поездки!"
                 )
-                return True  # Оформлено
+                return True, []
 
-            elif status in ["no_seats_on_date", "no_trips"]:
-                self.bot_say(msg)
+            elif status in ("no_seats_on_date", "no_trips"):
+                self.bot_say(data.get("message", "Мест нет."))
                 alternatives = data.get("alternatives", [])
                 if alternatives:
                     self.bot_say("Ближайшие доступные варианты:")
-                    for alt in alternatives[:3]:  # Ограничим 3
+                    for alt in alternatives[:3]:
                         self.bot_say(
-                            f"{alt['date']} в {alt['time']}, "
+                            f"  {alt['date']} в {alt['time']} — "
                             f"поезд {alt['train_number']}, "
-                            f"{alt['carriage_type']}, мест: {alt['available_seats']}, цена {alt['price']} руб."
+                            f"{alt['carriage_type']}, "
+                            f"мест: {alt['available_seats']}, "
+                            f"цена {alt['price']} руб."
                         )
-                    self.bot_say("Какой вариант выбираете, или уточните дату?")
                 else:
-                    self.bot_say("Попробуйте другие даты.")
-                return False  # Продолжаем диалог
+                    self.bot_say("Рейсов на ближайшие даты нет. Попробуйте другой маршрут.")
+                return False, alternatives
 
             else:
-                self.bot_say(f"Неизвестный ответ: {msg}")
-                return False
+                self.bot_say(f"Ошибка: {data.get('message', 'Неизвестная ошибка')}")
+                return False, []
 
         except Exception as e:
-            self.bot_say(f"Ошибка связи: {e}")
-            return False
+            self.bot_say(f"Ошибка связи с сервером: {e}")
+            return False, []
+
+    # ------------------------------------------------------------------
+    # Главный цикл
+    # ------------------------------------------------------------------
 
     def run(self):
-        self.bot_say("Здравствуйте! Это голосовой сервис покупки билетов РЖД.")
-
-        is_avaible_phone = False
-        while is_avaible_phone == False:
-            phone = input("Введите номер телефона пользователя (например, +79123456789): ").strip()
-            if len(phone) >= 15:
-                phone = input("Номер телефона некоректен. Введите ещё раз (например, +79123456789): ").strip()
-                is_avaible_phone = False
-            else:
-                is_avaible_phone = True
-
-
-        self.assistant_ai.add_user_message(
-            f"Начни диалог с вопроса: откуда, куда и на какую дату хочет отправиться пользователь."
+        self.bot_say(
+            "Здравствуйте! Это голосовой ассистент РЖД.\n"
+            "Я могу помочь купить билет или ответить на вопросы\n"
+            "о правилах перевозок, тарифах и возврате."
         )
 
-        self.bot_say("Диалог начат. Говорите в микрофон.")
+        phone = self._ask_phone()
+        self.bot_say("Отлично! Говорите — я слушаю.")
 
         while True:
-            ai_response = self.assistant_ai.get_response()
-            self.bot_say(ai_response)
+            # ---- Если идёт активный диалог бронирования ----
+            if self.router.is_buy_active():
+                buy = self.router.buy_agent
+                question = buy.get_next_question()
+                self.bot_say(question)
 
-            if self.assistant_ai.is_complete_json(ai_response):
-                order_json = self.assistant_ai.parse_json(ai_response)
-                if order_json:
-                    if self.send_to_java(order_json, phone):
-                        break  # Заказ оформлен — конец
-                    # Если мест нет — продолжаем диалог
-            else:
-                user_text = self.recognizer.listen()
+                user_text = self.listen()
                 if not user_text:
-                    self.bot_say("Не расслышал. Повторите.")
                     continue
-                self.assistant_ai.add_user_message(user_text)
+
+                error = buy.process_user_input(user_text)
+                if error:
+                    self.bot_say(error)
+                    continue
+
+                # Подтверждение получено — отправляем
+                if buy.is_done():
+                    order_json = buy.get_order_json()
+                    success, alternatives = self.send_to_java(order_json, phone)
+
+                    if success:
+                        self.router.finish_buy_session()
+                        self.bot_say("Чем ещё могу помочь?")
+                    else:
+                        # Нет мест — сбрасываем только дату, продолжаем
+                        buy.handle_no_seats(alternatives)
+                        if alternatives:
+                            self.bot_say("Выберите одну из предложенных дат или назовите другую.")
+                        else:
+                            self.bot_say("Попробуем другую дату.")
+                continue
+
+            # ---- Ожидаем новое намерение от пользователя ----
+            user_text = self.listen()
+            if not user_text:
+                continue
+
+            agent_name, response = self.router.route(user_text)
+
+            if agent_name == "clarify":
+                self.bot_say(response)
+
+            elif agent_name == "consult":
+                self.bot_say(response)
+                self.bot_say("Могу ещё чем-то помочь?")
+
+            elif agent_name == "buy":
+                # Роутер создал buy_agent — начинаем диалог бронирования
+                # Передаём первое сообщение пользователя в агент
+                buy = self.router.buy_agent
+                error = buy.process_user_input(user_text)
+                if error:
+                    # Если первая фраза не содержит нужных данных — просто начинаем диалог
+                    pass
+                # Следующая итерация цикла подхватит is_buy_active() == True
+
+    # ------------------------------------------------------------------
+
+    def _ask_phone(self) -> str:
+        while True:
+            phone = input("Введите номер телефона (например, +79123456789): ").strip()
+            if 10 <= len(phone) <= 15 and (phone.startswith("+") or phone.isdigit()):
+                return phone
+            print("Некорректный номер. Попробуйте снова.")
