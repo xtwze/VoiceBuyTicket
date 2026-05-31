@@ -115,11 +115,6 @@ VoiceBuyTicket/
    - `pip install -r requirements.txt`
    - `python main.py`
 
----
-
-## 📸 Демонстрация
-
-Скриншоты и примеры работы бота находятся в папке `demo/` (при наличии).
 
 ---
 
